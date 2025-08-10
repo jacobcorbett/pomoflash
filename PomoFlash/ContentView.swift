@@ -169,14 +169,15 @@ struct SettingsView: View {
 
     @Environment(\.dismiss) var dismiss
     @State private var showResetAlert = false
+    @State private var showWorkPicker = false
+    @State private var showBreakPicker = false
 
     var body: some View {
         NavigationView {
             Form {
+                // WORK
                 Section("Work Duration") {
-                    DurationPicker(totalSeconds: $workDuration, minutesRange: 0...120, secondsRange: 0...59)
-                        .frame(height: 170)
-
+                    // Quick presets stay visible
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 8) {
                             PresetChip(label: "15:00", seconds: 15*60, target: $workDuration)
@@ -186,16 +187,31 @@ struct SettingsView: View {
                         .padding(.vertical, 4)
                     }
 
-                    Text("Total: \(formatDuration(workDuration))")
+                    Text("Current: \(formatDuration(workDuration))")
                         .font(.caption)
                         .monospacedDigit()
                         .foregroundStyle(.secondary)
+
+                    DisclosureGroup(isExpanded: $showWorkPicker) {
+                        DurationPicker(totalSeconds: $workDuration, minutesRange: 0...120, secondsRange: 0...59)
+                            .frame(height: 170)
+                            .padding(.top, 6)
+                    } label: {
+                        HStack(spacing: 8) {
+                            Image(systemName: "slider.horizontal.3")
+                            Text("Custom (tap to adjust)")
+                            Spacer()
+                            Text(formatDuration(workDuration))
+                                .font(.caption)
+                                .monospacedDigit()
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .animation(.easeInOut, value: showWorkPicker)
                 }
 
+                // BREAK
                 Section("Break Duration") {
-                    DurationPicker(totalSeconds: $breakDuration, minutesRange: 0...60, secondsRange: 0...59)
-                        .frame(height: 170)
-
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 8) {
                             PresetChip(label: "03:00", seconds: 3*60, target: $breakDuration)
@@ -205,21 +221,37 @@ struct SettingsView: View {
                         .padding(.vertical, 4)
                     }
 
-                    Text("Total: \(formatDuration(breakDuration))")
+                    Text("Current: \(formatDuration(breakDuration))")
                         .font(.caption)
                         .monospacedDigit()
                         .foregroundStyle(.secondary)
+
+                    DisclosureGroup(isExpanded: $showBreakPicker) {
+                        DurationPicker(totalSeconds: $breakDuration, minutesRange: 0...60, secondsRange: 0...59)
+                            .frame(height: 170)
+                            .padding(.top, 6)
+                    } label: {
+                        HStack(spacing: 8) {
+                            Image(systemName: "slider.horizontal.3")
+                            Text("Custom (tap to adjust)")
+                            Spacer()
+                            Text(formatDuration(breakDuration))
+                                .font(.caption)
+                                .monospacedDigit()
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .animation(.easeInOut, value: showBreakPicker)
                 }
 
+                // DEV TOOLS
                 Section("Dev Tools") {
                     Button("Reset Everything", role: .destructive) {
                         showResetAlert = true
                     }
                     .alert("Reset Everything?", isPresented: $showResetAlert) {
                         Button("Cancel", role: .cancel) {}
-                        Button("Reset", role: .destructive) {
-                            onResetAll()
-                        }
+                        Button("Reset", role: .destructive) { onResetAll() }
                     } message: {
                         Text("This will reset the timer, switch back to Work, and clear today’s session count.")
                     }
@@ -228,10 +260,7 @@ struct SettingsView: View {
             .navigationTitle("Settings")
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") {
-                        onSave()
-                        dismiss()
-                    }
+                    Button("Save") { onSave(); dismiss() }
                 }
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
@@ -246,6 +275,7 @@ struct SettingsView: View {
         return String(format: "%02d:%02d", m, s)
     }
 }
+
 
 struct DurationPicker: View {
     @Binding var totalSeconds: Int

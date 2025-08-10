@@ -183,6 +183,11 @@ struct SettingsView: View {
                         get: { workDuration % 60 },
                         set: { workDuration = (workDuration / 60) * 60 + $0 }
                     ), in: 0...59)
+
+                    Text("Total: \(formatDuration(workDuration))")
+                        .font(.caption)
+                        .monospacedDigit()
+                        .foregroundStyle(.secondary)
                 }
 
                 Section("Break") {
@@ -195,6 +200,11 @@ struct SettingsView: View {
                         get: { breakDuration % 60 },
                         set: { breakDuration = (breakDuration / 60) * 60 + $0 }
                     ), in: 0...59)
+
+                    Text("Total: \(formatDuration(breakDuration))")
+                        .font(.caption)
+                        .monospacedDigit()
+                        .foregroundStyle(.secondary)
                 }
 
                 Section("Dev Tools") {
@@ -225,7 +235,14 @@ struct SettingsView: View {
             }
         }
     }
+
+    private func formatDuration(_ seconds: Int) -> String {
+        let m = max(0, seconds) / 60
+        let s = max(0, seconds) % 60
+        return String(format: "%02d:%02d", m, s)
+    }
 }
+
 
 #Preview {
     ContentView()

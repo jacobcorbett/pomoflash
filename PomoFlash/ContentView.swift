@@ -1,22 +1,25 @@
+// ContentView.swift
 import SwiftUI
 import AVFoundation
 import UserNotifications
 import AudioToolbox
 
-
 struct ContentView: View {
     @AppStorage("workDuration") private var workDuration = 25 * 60
     @AppStorage("breakDuration") private var breakDuration = 5 * 60
-
-    @State private var timeRemaining: Double = 25.0 * 60.0
-    @State private var isRunning = false
-    @State private var timerType = "Work" // "Work" or "Break"
+    
+    // Persistent state using @AppStorage
+    @AppStorage("timeRemaining") private var timeRemaining: Double = 25.0 * 60.0
+    @AppStorage("isRunning") private var isRunning = false
+    @AppStorage("timerType") private var timerType = "Work"
+    @AppStorage("sessionsCompleted") private var sessionsCompleted = 0
+    @AppStorage("lastActiveTime") private var lastActiveTime: Double = 0
+    
     @State private var timer: Timer?
-    @State private var sessionsCompleted = 0
     @State private var showingSettings = false
     @State private var audioPlayer: AVAudioPlayer?
-
-    private let tickInterval = 1.0 / 60.0 // ~60 FPS
+    
+    private let tickInterval = 1.0 / 60.0
 
     var progress: Double {
         let total = timerType == "Work" ? Double(workDuration) : Double(breakDuration)
@@ -80,10 +83,62 @@ struct ContentView: View {
                     onResetAll: { resetEverything() }
                 )
             }
+            .onAppear {
+                syncTimerFromBackground()
+                if timeRemaining <= 0 {
+                    timeRemaining = Double(workDuration)
+                }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: UIApplication.willResignActiveNotification)) { _ in
+                saveCurrentState()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
+                syncTimerFromBackground()
+            }
         }
-        .onAppear {
-            timeRemaining = Double(workDuration)
+    }
+
+    // MARK: - Background Persistence
+    
+    private func saveCurrentState() {
+        lastActiveTime = Date().timeIntervalSince1970
+        // AppStorage properties automatically save
+    }
+    
+    private func syncTimerFromBackground() {
+        guard lastActiveTime > 0 else { return }
+        
+        let currentTime = Date().timeIntervalSince1970
+        let timeElapsed = currentTime - lastActiveTime
+        
+        if isRunning && timeElapsed > 0 {
+            // Calculate how much time should have passed
+            timeRemaining = max(0, timeRemaining - timeElapsed)
+            
+            // Handle phase transitions that happened in background
+            while timeRemaining <= 0 && isRunning {
+                finishPhaseInBackground()
+            }
         }
+        
+        // Restart the visual timer if it was running
+        if isRunning && timeRemaining > 0 {
+            startVisualTimer()
+        }
+    }
+    
+    private func finishPhaseInBackground() {
+        if timerType == "Work" {
+            timerType = "Break"
+            timeRemaining += Double(breakDuration)
+            sessionsCompleted += 1
+        } else {
+            timerType = "Work"
+            timeRemaining += Double(workDuration)
+        }
+        
+        // Schedule notification for phase completion
+        schedulePhaseCompletionNotification()
     }
 
     // MARK: - Timer Control
@@ -91,13 +146,19 @@ struct ContentView: View {
     func startTimer() {
         guard !isRunning else { return }
         isRunning = true
-        timer?.invalidate()
-
+        lastActiveTime = Date().timeIntervalSince1970
+        
         if timeRemaining <= 0 {
             finishPhase()
             return
         }
-
+        
+        startVisualTimer()
+        scheduleBackgroundNotification()
+    }
+    
+    private func startVisualTimer() {
+        timer?.invalidate()
         timer = Timer.scheduledTimer(withTimeInterval: tickInterval, repeats: true) { _ in
             if timeRemaining > 0 {
                 timeRemaining -= tickInterval
@@ -117,11 +178,14 @@ struct ContentView: View {
         isRunning = false
         timer?.invalidate()
         timer = nil
+        cancelBackgroundNotifications()
+        saveCurrentState()
     }
 
     func resetTimer() {
         pauseTimer()
         timeRemaining = timerType == "Work" ? Double(workDuration) : Double(breakDuration)
+        cancelBackgroundNotifications()
     }
 
     func resetEverything() {
@@ -129,6 +193,8 @@ struct ContentView: View {
         timerType = "Work"
         timeRemaining = Double(workDuration)
         sessionsCompleted = 0
+        lastActiveTime = 0
+        cancelBackgroundNotifications()
     }
 
     private func finishPhase() {
@@ -142,6 +208,59 @@ struct ContentView: View {
             timerType = "Work"
             timeRemaining = Double(workDuration)
         }
+    }
+    
+    // MARK: - Background Notifications
+    
+    private func scheduleBackgroundNotification() {
+        let center = UNUserNotificationCenter.current()
+        
+        // Cancel any existing notifications
+        cancelBackgroundNotifications()
+        
+        // Schedule notification for when current phase ends
+        let content = UNMutableNotificationContent()
+        content.title = "Pomodoro Timer"
+        content.body = timerType == "Work"
+            ? "Work session complete! Time for a break."
+            : "Break over! Ready to get back to work?"
+        content.sound = .default
+        content.badge = 1
+        
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: timeRemaining, repeats: false)
+        let request = UNNotificationRequest(
+            identifier: "pomodoroPhaseComplete",
+            content: content,
+            trigger: trigger
+        )
+        
+        center.add(request)
+    }
+    
+    private func schedulePhaseCompletionNotification() {
+        let center = UNUserNotificationCenter.current()
+        
+        let content = UNMutableNotificationContent()
+        content.title = "Pomodoro Timer"
+        content.body = timerType == "Work"
+            ? "Work session complete! Time for a break."
+            : "Break over! Ready to get back to work?"
+        content.sound = .default
+        content.badge = 1
+        
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 0.1, repeats: false)
+        let request = UNNotificationRequest(
+            identifier: UUID().uuidString,
+            content: content,
+            trigger: trigger
+        )
+        
+        center.add(request)
+    }
+    
+    private func cancelBackgroundNotifications() {
+        let center = UNUserNotificationCenter.current()
+        center.removePendingNotificationRequests(withIdentifiers: ["pomodoroPhaseComplete"])
     }
 
     // MARK: - Utils
@@ -158,7 +277,6 @@ struct ContentView: View {
 
         center.getNotificationSettings { settings in
             if settings.authorizationStatus == .authorized {
-                // Use the system’s default notification sound (no audio file needed)
                 let content = UNMutableNotificationContent()
                 content.title = "Pomodoro"
                 content.body = (timerType == "Work")
@@ -166,19 +284,18 @@ struct ContentView: View {
                     : "Break over — back to work."
                 content.sound = .default
 
-                // Fire immediately (tiny delay so iOS actually schedules it)
                 let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 0.1, repeats: false)
                 let req = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: trigger)
                 center.add(req, withCompletionHandler: nil)
             } else {
-                // Fallback: a small built-in system tick + haptic
-                AudioServicesPlaySystemSound(1103) // "Tink" style tap; IDs are undocumented and may change
+                AudioServicesPlaySystemSound(1103)
                 UINotificationFeedbackGenerator().notificationOccurred(.success)
             }
         }
     }
-
 }
+
+// MARK: - Settings View (unchanged)
 
 struct SettingsView: View {
     @Binding var workDuration: Int
@@ -194,9 +311,7 @@ struct SettingsView: View {
     var body: some View {
         NavigationView {
             Form {
-                // WORK
                 Section("Work Duration") {
-                    // Quick presets stay visible
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 8) {
                             PresetChip(label: "15:00", seconds: 15*60, target: $workDuration)
@@ -229,7 +344,6 @@ struct SettingsView: View {
                     .animation(.easeInOut, value: showWorkPicker)
                 }
 
-                // BREAK
                 Section("Break Duration") {
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 8) {
@@ -263,7 +377,6 @@ struct SettingsView: View {
                     .animation(.easeInOut, value: showBreakPicker)
                 }
 
-                // DEV TOOLS
                 Section("Dev Tools") {
                     Button("Reset Everything", role: .destructive) {
                         showResetAlert = true
@@ -272,7 +385,7 @@ struct SettingsView: View {
                         Button("Cancel", role: .cancel) {}
                         Button("Reset", role: .destructive) { onResetAll() }
                     } message: {
-                        Text("This will reset the timer, switch back to Work, and clear today’s session count.")
+                        Text("This will reset the timer, switch back to Work, and clear today's session count.")
                     }
                 }
             }
@@ -294,7 +407,6 @@ struct SettingsView: View {
         return String(format: "%02d:%02d", m, s)
     }
 }
-
 
 struct DurationPicker: View {
     @Binding var totalSeconds: Int
@@ -341,8 +453,6 @@ struct PresetChip: View {
             .clipShape(Capsule())
     }
 }
-
-
 
 #Preview {
     ContentView()

@@ -127,11 +127,12 @@ struct ContentView: View {
             while timeRemaining <= 0 && isRunning {
                 finishPhaseInBackground()
             }
-        }
-        
-        // Restart the visual timer if it was running
-        if isRunning && timeRemaining > 0 {
-            startVisualTimer()
+            
+            // If still running after background phase transitions, restart visual timer
+            if isRunning && timeRemaining > 0 {
+                startVisualTimer()
+                scheduleBackgroundNotification() // Reschedule for the current phase
+            }
         }
     }
     
@@ -145,8 +146,8 @@ struct ContentView: View {
             timeRemaining += Double(workDuration)
         }
         
-        // Schedule notification for phase completion
-        schedulePhaseCompletionNotification()
+        // Don't schedule additional notifications here - they're already scheduled
+        // when the timer starts, and we don't want duplicate sounds
     }
 
     // MARK: - Timer Control
@@ -216,6 +217,9 @@ struct ContentView: View {
             timerType = "Work"
             timeRemaining = Double(workDuration)
         }
+        
+        // Auto-start the next phase
+        startTimer()
     }
     
     // MARK: - Background Notifications
@@ -225,6 +229,9 @@ struct ContentView: View {
         
         // Cancel any existing notifications
         cancelBackgroundNotifications()
+        
+        // Only schedule if there's time remaining
+        guard timeRemaining > 0 else { return }
         
         // Schedule notification for when current phase ends
         let content = UNMutableNotificationContent()
@@ -245,26 +252,6 @@ struct ContentView: View {
         center.add(request)
     }
     
-    private func schedulePhaseCompletionNotification() {
-        let center = UNUserNotificationCenter.current()
-        
-        let content = UNMutableNotificationContent()
-        content.title = "Pomodoro Timer"
-        content.body = timerType == "Work"
-            ? "\(workLabel) session complete! Time for \(breakLabel.lowercased())."
-            : "\(breakLabel) over! Ready for \(workLabel.lowercased())?"
-        content.sound = .default
-        content.badge = 1
-        
-        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 0.1, repeats: false)
-        let request = UNNotificationRequest(
-            identifier: UUID().uuidString,
-            content: content,
-            trigger: trigger
-        )
-        
-        center.add(request)
-    }
     
     private func cancelBackgroundNotifications() {
         let center = UNUserNotificationCenter.current()
@@ -281,23 +268,27 @@ struct ContentView: View {
     }
 
     func playSound() {
-        let center = UNUserNotificationCenter.current()
+        // When app is active, just use haptic feedback (no sound)
+        if UIApplication.shared.applicationState == .active {
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+        } else {
+            // When app is not active, use notification sound
+            let center = UNUserNotificationCenter.current()
+            center.getNotificationSettings { settings in
+                if settings.authorizationStatus == .authorized {
+                    let content = UNMutableNotificationContent()
+                    content.title = "Pomodoro"
+                    content.body = (self.timerType == "Work")
+                        ? "\(self.workLabel) session done — time for \(self.breakLabel.lowercased())."
+                        : "\(self.breakLabel) over — back to \(self.workLabel.lowercased())."
+                    content.sound = .default
 
-        center.getNotificationSettings { settings in
-            if settings.authorizationStatus == .authorized {
-                let content = UNMutableNotificationContent()
-                content.title = "Pomodoro"
-                content.body = (timerType == "Work")
-                    ? "\(workLabel) session done — time for \(breakLabel.lowercased())."
-                    : "\(breakLabel) over — back to \(workLabel.lowercased())."
-                content.sound = .default
-
-                let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 0.1, repeats: false)
-                let req = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: trigger)
-                center.add(req, withCompletionHandler: nil)
-            } else {
-                AudioServicesPlaySystemSound(1103)
-                UINotificationFeedbackGenerator().notificationOccurred(.success)
+                    let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 0.1, repeats: false)
+                    let req = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: trigger)
+                    center.add(req, withCompletionHandler: nil)
+                } else {
+                    UINotificationFeedbackGenerator().notificationOccurred(.success)
+                }
             }
         }
     }

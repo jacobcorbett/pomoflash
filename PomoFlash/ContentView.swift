@@ -1,4 +1,5 @@
 import SwiftUI
+import AVFoundation
 
 struct ContentView: View {
     @AppStorage("workDuration") private var workDuration = 25 * 60
@@ -6,14 +7,15 @@ struct ContentView: View {
     
     @State private var timeRemaining = 25 * 60
     @State private var isRunning = false
-    @State private var timerType = "Work" // "Work" or "Break"
+    @State private var timerType = "Work"
     @State private var timer: Timer?
     @State private var sessionsCompleted = 0
     @State private var showingSettings = false
+    @State private var audioPlayer: AVAudioPlayer?
     
     var progress: Double {
         let totalTime = timerType == "Work" ? Double(workDuration) : Double(breakDuration)
-        return 1 - (Double(timeRemaining) / totalTime)
+        return totalTime > 0 ? 1 - (Double(timeRemaining) / totalTime) : 1
     }
     
     var body: some View {
@@ -34,7 +36,6 @@ struct ContentView: View {
                         .stroke(style: StrokeStyle(lineWidth: 20, lineCap: .round))
                         .foregroundColor(timerType == "Work" ? .red : .green)
                         .rotationEffect(Angle(degrees: -90))
-                        .animation(.linear, value: progress)
                     
                     Text(formatTime(timeRemaining))
                         .font(.system(size: 48, weight: .bold, design: .monospaced))
@@ -98,6 +99,8 @@ struct ContentView: View {
             } else {
                 timer?.invalidate()
                 isRunning = false
+                playSound()
+                
                 if timerType == "Work" {
                     timerType = "Break"
                     timeRemaining = breakDuration
@@ -132,6 +135,16 @@ struct ContentView: View {
         let seconds = seconds % 60
         return String(format: "%02d:%02d", minutes, seconds)
     }
+    
+    func playSound() {
+        guard let soundURL = Bundle.main.url(forResource: "ding", withExtension: "mp3") else { return }
+        do {
+            audioPlayer = try AVAudioPlayer(contentsOf: soundURL)
+            audioPlayer?.play()
+        } catch {
+            print("Error playing sound: \(error.localizedDescription)")
+        }
+    }
 }
 
 struct SettingsView: View {
@@ -144,8 +157,25 @@ struct SettingsView: View {
     var body: some View {
         NavigationView {
             Form {
-                Stepper("Work Duration: \(workDuration / 60) min", value: $workDuration, in: 1*60...120*60, step: 60)
-                Stepper("Break Duration: \(breakDuration / 60) min", value: $breakDuration, in: 1*60...60*60, step: 60)
+                Stepper("Work Minutes: \(workDuration / 60)", value: Binding(
+                    get: { workDuration / 60 },
+                    set: { workDuration = $0 * 60 + workDuration % 60 }
+                ), in: 0...120)
+                
+                Stepper("Work Seconds: \(workDuration % 60)", value: Binding(
+                    get: { workDuration % 60 },
+                    set: { workDuration = (workDuration / 60) * 60 + $0 }
+                ), in: 0...59)
+                
+                Stepper("Break Minutes: \(breakDuration / 60)", value: Binding(
+                    get: { breakDuration / 60 },
+                    set: { breakDuration = $0 * 60 + breakDuration % 60 }
+                ), in: 0...60)
+                
+                Stepper("Break Seconds: \(breakDuration % 60)", value: Binding(
+                    get: { breakDuration % 60 },
+                    set: { breakDuration = (breakDuration / 60) * 60 + $0 }
+                ), in: 0...59)
             }
             .navigationTitle("Settings")
             .toolbar {

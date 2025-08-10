@@ -7,6 +7,8 @@ import AudioToolbox
 struct ContentView: View {
     @AppStorage("workDuration") private var workDuration = 25 * 60
     @AppStorage("breakDuration") private var breakDuration = 5 * 60
+    @AppStorage("workLabel") private var workLabel = "Work"
+    @AppStorage("breakLabel") private var breakLabel = "Break"
     
     // Persistent state using @AppStorage
     @AppStorage("timeRemaining") private var timeRemaining: Double = 25.0 * 60.0
@@ -26,11 +28,15 @@ struct ContentView: View {
         guard total > 0 else { return 1 }
         return min(1, max(0, 1 - (timeRemaining / total)))
     }
+    
+    private var currentLabel: String {
+        timerType == "Work" ? workLabel : breakLabel
+    }
 
     var body: some View {
         NavigationView {
             VStack(spacing: 40) {
-                Text(timerType)
+                Text(currentLabel)
                     .font(.title)
                     .foregroundColor(timerType == "Work" ? .red : .green)
 
@@ -79,6 +85,8 @@ struct ContentView: View {
                 SettingsView(
                     workDuration: $workDuration,
                     breakDuration: $breakDuration,
+                    workLabel: $workLabel,
+                    breakLabel: $breakLabel,
                     onSave: { resetEverything() },
                     onResetAll: { resetEverything() }
                 )
@@ -222,8 +230,8 @@ struct ContentView: View {
         let content = UNMutableNotificationContent()
         content.title = "Pomodoro Timer"
         content.body = timerType == "Work"
-            ? "Work session complete! Time for a break."
-            : "Break over! Ready to get back to work?"
+            ? "\(workLabel) session complete! Time for \(breakLabel.lowercased())."
+            : "\(breakLabel) over! Ready for \(workLabel.lowercased())?"
         content.sound = .default
         content.badge = 1
         
@@ -243,8 +251,8 @@ struct ContentView: View {
         let content = UNMutableNotificationContent()
         content.title = "Pomodoro Timer"
         content.body = timerType == "Work"
-            ? "Work session complete! Time for a break."
-            : "Break over! Ready to get back to work?"
+            ? "\(workLabel) session complete! Time for \(breakLabel.lowercased())."
+            : "\(breakLabel) over! Ready for \(workLabel.lowercased())?"
         content.sound = .default
         content.badge = 1
         
@@ -280,8 +288,8 @@ struct ContentView: View {
                 let content = UNMutableNotificationContent()
                 content.title = "Pomodoro"
                 content.body = (timerType == "Work")
-                    ? "Work session done — time for a break."
-                    : "Break over — back to work."
+                    ? "\(workLabel) session done — time for \(breakLabel.lowercased())."
+                    : "\(breakLabel) over — back to \(workLabel.lowercased())."
                 content.sound = .default
 
                 let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 0.1, repeats: false)
@@ -300,6 +308,8 @@ struct ContentView: View {
 struct SettingsView: View {
     @Binding var workDuration: Int
     @Binding var breakDuration: Int
+    @Binding var workLabel: String
+    @Binding var breakLabel: String
     var onSave: () -> Void
     var onResetAll: () -> Void
 
@@ -311,7 +321,16 @@ struct SettingsView: View {
     var body: some View {
         NavigationView {
             Form {
-                Section("Work Duration") {
+                // WORK SETTINGS
+                Section("Work Session") {
+                    // Label customization
+                    HStack {
+                        Text("Label:")
+                        TextField("Work", text: $workLabel)
+                            .textFieldStyle(.roundedBorder)
+                    }
+                    
+                    // Duration presets
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 8) {
                             PresetChip(label: "15:00", seconds: 15*60, target: $workDuration)
@@ -344,7 +363,16 @@ struct SettingsView: View {
                     .animation(.easeInOut, value: showWorkPicker)
                 }
 
-                Section("Break Duration") {
+                // BREAK SETTINGS
+                Section("Break Session") {
+                    // Label customization
+                    HStack {
+                        Text("Label:")
+                        TextField("Break", text: $breakLabel)
+                            .textFieldStyle(.roundedBorder)
+                    }
+                    
+                    // Duration presets
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 8) {
                             PresetChip(label: "03:00", seconds: 3*60, target: $breakDuration)

@@ -173,16 +173,18 @@ struct SettingsView: View {
     var body: some View {
         NavigationView {
             Form {
-                Section("Work") {
-                    Stepper("Minutes: \(workDuration / 60)", value: Binding(
-                        get: { workDuration / 60 },
-                        set: { workDuration = $0 * 60 + workDuration % 60 }
-                    ), in: 0...120)
+                Section("Work Duration") {
+                    DurationPicker(totalSeconds: $workDuration, minutesRange: 0...120, secondsRange: 0...59)
+                        .frame(height: 170)
 
-                    Stepper("Seconds: \(workDuration % 60)", value: Binding(
-                        get: { workDuration % 60 },
-                        set: { workDuration = (workDuration / 60) * 60 + $0 }
-                    ), in: 0...59)
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            PresetChip(label: "15:00", seconds: 15*60, target: $workDuration)
+                            PresetChip(label: "25:00", seconds: 25*60, target: $workDuration)
+                            PresetChip(label: "50:00", seconds: 50*60, target: $workDuration)
+                        }
+                        .padding(.vertical, 4)
+                    }
 
                     Text("Total: \(formatDuration(workDuration))")
                         .font(.caption)
@@ -190,16 +192,18 @@ struct SettingsView: View {
                         .foregroundStyle(.secondary)
                 }
 
-                Section("Break") {
-                    Stepper("Minutes: \(breakDuration / 60)", value: Binding(
-                        get: { breakDuration / 60 },
-                        set: { breakDuration = $0 * 60 + breakDuration % 60 }
-                    ), in: 0...60)
+                Section("Break Duration") {
+                    DurationPicker(totalSeconds: $breakDuration, minutesRange: 0...60, secondsRange: 0...59)
+                        .frame(height: 170)
 
-                    Stepper("Seconds: \(breakDuration % 60)", value: Binding(
-                        get: { breakDuration % 60 },
-                        set: { breakDuration = (breakDuration / 60) * 60 + $0 }
-                    ), in: 0...59)
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            PresetChip(label: "03:00", seconds: 3*60, target: $breakDuration)
+                            PresetChip(label: "05:00", seconds: 5*60, target: $breakDuration)
+                            PresetChip(label: "10:00", seconds: 10*60, target: $breakDuration)
+                        }
+                        .padding(.vertical, 4)
+                    }
 
                     Text("Total: \(formatDuration(breakDuration))")
                         .font(.caption)
@@ -242,6 +246,53 @@ struct SettingsView: View {
         return String(format: "%02d:%02d", m, s)
     }
 }
+
+struct DurationPicker: View {
+    @Binding var totalSeconds: Int
+    var minutesRange: ClosedRange<Int> = 0...120
+    var secondsRange: ClosedRange<Int> = 0...59
+
+    var body: some View {
+        HStack(spacing: 16) {
+            Picker("Minutes", selection: Binding(
+                get: { totalSeconds / 60 },
+                set: { totalSeconds = $0 * 60 + totalSeconds % 60 }
+            )) {
+                ForEach(minutesRange, id: \.self) { m in
+                    Text("\(m) min").tag(m)
+                }
+            }
+            .pickerStyle(.wheel)
+            .frame(maxWidth: .infinity)
+
+            Picker("Seconds", selection: Binding(
+                get: { totalSeconds % 60 },
+                set: { totalSeconds = (totalSeconds / 60) * 60 + $0 }
+            )) {
+                ForEach(secondsRange, id: \.self) { s in
+                    Text(String(format: "%02d sec", s)).tag(s)
+                }
+            }
+            .pickerStyle(.wheel)
+            .frame(maxWidth: .infinity)
+        }
+        .accessibilityElement(children: .contain)
+    }
+}
+
+struct PresetChip: View {
+    let label: String
+    let seconds: Int
+    @Binding var target: Int
+
+    var body: some View {
+        Button(label) { target = seconds }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+            .clipShape(Capsule())
+    }
+}
+
 
 
 #Preview {

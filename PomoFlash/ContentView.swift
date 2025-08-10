@@ -1,5 +1,8 @@
 import SwiftUI
 import AVFoundation
+import UserNotifications
+import AudioToolbox
+
 
 struct ContentView: View {
     @AppStorage("workDuration") private var workDuration = 25 * 60
@@ -151,14 +154,30 @@ struct ContentView: View {
     }
 
     func playSound() {
-        guard let soundURL = Bundle.main.url(forResource: "ding", withExtension: "mp3") else { return }
-        do {
-            audioPlayer = try AVAudioPlayer(contentsOf: soundURL)
-            audioPlayer?.play()
-        } catch {
-            print("Error playing sound: \(error.localizedDescription)")
+        let center = UNUserNotificationCenter.current()
+
+        center.getNotificationSettings { settings in
+            if settings.authorizationStatus == .authorized {
+                // Use the system’s default notification sound (no audio file needed)
+                let content = UNMutableNotificationContent()
+                content.title = "Pomodoro"
+                content.body = (timerType == "Work")
+                    ? "Work session done — time for a break."
+                    : "Break over — back to work."
+                content.sound = .default
+
+                // Fire immediately (tiny delay so iOS actually schedules it)
+                let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 0.1, repeats: false)
+                let req = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: trigger)
+                center.add(req, withCompletionHandler: nil)
+            } else {
+                // Fallback: a small built-in system tick + haptic
+                AudioServicesPlaySystemSound(1103) // "Tink" style tap; IDs are undocumented and may change
+                UINotificationFeedbackGenerator().notificationOccurred(.success)
+            }
         }
     }
+
 }
 
 struct SettingsView: View {

@@ -1,10 +1,11 @@
+// PomoFlashApp.swift
 import SwiftUI
 import UserNotifications
 
 @main
 struct PomodoroApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
-    var body: some Scene { WindowGroup { ContentView() } }
+    var body: some Scene { WindowGroup { MainTabView() } }  
 }
 
 final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {

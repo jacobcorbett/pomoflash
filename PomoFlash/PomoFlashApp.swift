@@ -1,11 +1,10 @@
-// PomoFlashApp.swift
 import SwiftUI
 import UserNotifications
 
 @main
 struct PomodoroApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
-    var body: some Scene { WindowGroup { MainTabView() } }  
+    var body: some Scene { WindowGroup { MainTabView() } }
 }
 
 final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
@@ -17,7 +16,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
         return true
     }
 
-    // Make sounds play while app is in the foreground.
+    // Play notification sounds while app is foregrounded
     func userNotificationCenter(_ center: UNUserNotificationCenter,
         willPresent notification: UNNotification,
         withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {

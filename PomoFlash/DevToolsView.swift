@@ -18,6 +18,7 @@ struct DevToolsView: View {
 
     var body: some View {
         List {
+            // --- Runtime snapshot ---
             Section("Runtime State") {
                 LabeledContent("Timer type", value: timerType)
                 LabeledContent("Is running", value: isRunning ? "true" : "false")
@@ -25,9 +26,13 @@ struct DevToolsView: View {
                 LabeledContent("Sessions completed", value: "\(sessionsCompleted)")
                 LabeledContent("Last active", value: formatDate(lastActiveTime))
                 LabeledContent("Pending notifications", value: "\(pendingCount)")
+                LabeledContent("Work label", value: workLabel)
+                LabeledContent("Break label", value: breakLabel)
+
                 Button("Refresh Pending Notifications") { refreshPending() }
             }
 
+            // --- Quick actions ---
             Section("Actions") {
                 Button("Complete current phase") { completeCurrentPhase() }
                 Button("Send test notification now") { sendTestNotificationNow() }
@@ -35,10 +40,12 @@ struct DevToolsView: View {
                 Button("Cancel pending notifications") { cancelBackgroundNotifications() }
             }
 
+            // --- Edit state ---
             Section("Edit State") {
                 Stepper("Sessions: \(sessionsCompleted)",
                         onIncrement: { sessionsCompleted += 1 },
                         onDecrement: { sessionsCompleted = max(0, sessionsCompleted - 1) })
+
                 Button("Reset everything", role: .destructive) { showResetAlert = true }
                     .alert("Reset Everything?", isPresented: $showResetAlert) {
                         Button("Cancel", role: .cancel) {}
@@ -46,6 +53,31 @@ struct DevToolsView: View {
                     }
             }
 
+            // --- Labels (your request) ---
+            Section("Labels") {
+                HStack {
+                    Text("Work label")
+                    Spacer()
+                    TextField("Work", text: $workLabel)
+                        .multilineTextAlignment(.trailing)
+                        .textInputAutocapitalization(.words)
+                        .disableAutocorrection(true)
+                }
+                HStack {
+                    Text("Break label")
+                    Spacer()
+                    TextField("Break", text: $breakLabel)
+                        .multilineTextAlignment(.trailing)
+                        .textInputAutocapitalization(.words)
+                        .disableAutocorrection(true)
+                }
+                Button("Reset labels to defaults") {
+                    workLabel = "Work"
+                    breakLabel = "Break"
+                }
+            }
+
+            // --- Durations snapshot ---
             Section("Durations") {
                 LabeledContent("Work length", value: mmss(workDuration))
                 LabeledContent("Break length", value: mmss(breakDuration))

@@ -1,4 +1,5 @@
 import SwiftUI
+#Preview { MainTabView() }
 
 struct MainTabView: View {
     @State private var selection = 1 // start on Timer

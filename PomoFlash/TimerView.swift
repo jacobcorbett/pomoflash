@@ -17,8 +17,6 @@ struct TimerView: View {
     @AppStorage("lastActiveTime") private var lastActiveTime: Double = 0
 
     @State private var timer: Timer?
-    @State private var showingSettings = false
-    @State private var audioPlayer: AVAudioPlayer?
 
     private let tickInterval = 1.0 / 60.0
 
@@ -66,27 +64,9 @@ struct TimerView: View {
                     }
                     .buttonStyle(.bordered)
                 }
-
-                Text("Sessions Completed: \(sessionsCompleted)")
-                    .font(.headline)
             }
             .padding()
             .navigationTitle("Pomodoro")
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button { showingSettings = true } label: { Image(systemName: "gearshape") }
-                }
-            }
-            .sheet(isPresented: $showingSettings) {
-                SettingsView(
-                    workDuration: $workDuration,
-                    breakDuration: $breakDuration,
-                    workLabel: $workLabel,
-                    breakLabel: $breakLabel,
-                    onSave: { resetEverything() },
-                    onResetAll: { resetEverything() }
-                )
-            }
             .onAppear {
                 syncTimerFromBackground()
                 if timeRemaining <= 0 { timeRemaining = Double(workDuration) }
